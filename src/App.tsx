@@ -1,3 +1,4 @@
+import {BusinessPortal,AcademyCertificateVerification} from '@/pages/business-centre/BusinessPortal';
 import {Navigate,Route,Routes} from 'react-router-dom';
 import {ProtectedRoute} from '@/components/ProtectedRoute';
 import {BusinessUnitPage,BusinessCustomerWorkspace} from '@/pages/business-centre/BusinessOperations';
@@ -13,7 +14,9 @@ const prefix='/academy';
 export default function App(){return <Routes>
 <Route path="/" element={<BusinessUnitPage unit={unit}/>}/>
 <Route path={prefix} element={<BusinessUnitPage unit={unit}/>}/>
-<Route path={prefix+'/dashboard'} element={<ProtectedRoute product={unit} requireServiceAccess><BusinessCustomerWorkspace unit={unit}/></ProtectedRoute>}/>
+<Route path={prefix+'/dashboard'} element={<ProtectedRoute product={unit} requireServiceAccess><BusinessPortal unit={unit}/></ProtectedRoute>}/>
+<Route path={prefix+'/verify-certificate'} element={<AcademyCertificateVerification/>}/>
+<Route path={prefix+'/:page'} element={<ProtectedRoute product={unit} requireServiceAccess><BusinessPortal unit={unit}/></ProtectedRoute>}/>
 <Route path={prefix+'/get-in-touch'} element={<BusinessSupport unit={unit}/>}/>
 <Route path="/access-denied" element={<BusinessAccessDenied unit={unit}/>}/>
 <Route path="/admin/access-denied" element={<BusinessAccessDenied unit={unit}/>}/>
