@@ -14,6 +14,8 @@ const prefix='/academy';
 export default function App(){return <Routes>
 <Route path="/" element={<BusinessUnitPage unit={unit}/>}/>
 <Route path={prefix} element={<BusinessUnitPage unit={unit}/>}/>
+<Route path={prefix+'/services'} element={<BusinessUnitPage unit={unit} view="services"/>}/>
+<Route path={prefix+'/request'} element={<BusinessUnitPage unit={unit} view="request"/>}/>
 <Route path={prefix+'/dashboard'} element={<ProtectedRoute product={unit} requireServiceAccess><BusinessPortal unit={unit}/></ProtectedRoute>}/>
 <Route path={prefix+'/verify-certificate'} element={<AcademyCertificateVerification/>}/>
 <Route path={prefix+'/:page'} element={<ProtectedRoute product={unit} requireServiceAccess><BusinessPortal unit={unit}/></ProtectedRoute>}/>
