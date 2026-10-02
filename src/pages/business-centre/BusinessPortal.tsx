@@ -40,7 +40,7 @@ export function BusinessPortal({unit}:{unit:Unit}) {
   if(unit==='academy'){
    const [courses,enrollments]=await Promise.all([supabase.from('academy_courses').select('*').eq('is_active',true).order('title'),supabase.from('academy_enrollments').select('*').eq('user_id',user.id)]);
    if(courses.error||enrollments.error)throw courses.error||enrollments.error;data.courses=courses.data||[];data.enrollments=enrollments.data||[];
-   const courseIds=data.enrollments.map(x=>x.course_id),enrollmentIds=data.enrollments.map(x=>x.id);
+   const accessible=data.enrollments.filter(x=>['active','completed'].includes(String(x.status))),courseIds=accessible.map(x=>x.course_id),enrollmentIds=accessible.map(x=>x.id);
    if(courseIds.length)for(const table of ['academy_sessions','academy_resources']){const r=await supabase.from(table).select('*').in('course_id',courseIds);if(r.error)throw r.error;data[table]=r.data||[];}
    if(enrollmentIds.length)for(const table of ['academy_attendance','academy_certificates']){const r=await supabase.from(table).select('*').in('enrollment_id',enrollmentIds);if(r.error)throw r.error;data[table]=r.data||[];}
   }
