@@ -7,13 +7,13 @@ import { BusinessNavigation, BusinessFooter, unitPaths } from './BusinessNavigat
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import {LayoutDashboard,ClipboardList,FileText,Receipt,CreditCard,Files,Bell,LifeBuoy,UserRound,Settings,Factory,GraduationCap,CalendarDays,BookOpen,ScrollText,ArrowRight} from 'lucide-react';
-const navIcons:Record<string,typeof LayoutDashboard>={dashboard:LayoutDashboard,requests:ClipboardList,quotes:FileText,invoices:Receipt,payments:CreditCard,files:Files,notifications:Bell,support:LifeBuoy,profile:UserRound,settings:Settings,production:Factory,courses:GraduationCap,sessions:CalendarDays,attendance:ClipboardList,resources:BookOpen,certificates:ScrollText,usage:Factory};
-const navDescriptions:Record<string,string>={requests:'View and manage your submitted requests.',quotes:'Review quotations and responses.',invoices:'Issued invoices and amounts due.',payments:'Verified payments and instructions.',files:'Project files and private attachments.',notifications:'Important service updates.',support:'Open and follow support requests.',profile:'Your identity and contact details.',settings:'Account and security controls.',production:'Track active jobs and fulfilment.',usage:'Review recorded compute usage.',courses:'Browse courses and enrolment activity.',sessions:'Learning schedule and upcoming sessions.',attendance:'Your confirmed attendance records.',resources:'Learning resources and assignments.',certificates:'Completion certificates and verification.'};
+const navIcons:Record<string,typeof LayoutDashboard>={dashboard:LayoutDashboard,requests:ClipboardList,quotes:FileText,invoices:Receipt,payments:CreditCard,files:Files,notifications:Bell,support:LifeBuoy,profile:UserRound,settings:Settings,production:Factory,courses:GraduationCap,sessions:CalendarDays,attendance:ClipboardList,resources:BookOpen,certificates:ScrollText,assignments:ClipboardList,usage:Factory};
+const navDescriptions:Record<string,string>={requests:'View and manage your submitted requests.',quotes:'Review quotations and responses.',invoices:'Issued invoices and amounts due.',payments:'Verified payments and instructions.',files:'Project files and private attachments.',notifications:'Important service updates.',support:'Open and follow support requests.',profile:'Your identity and contact details.',settings:'Account and security controls.',production:'Track active jobs and fulfilment.',usage:'Review recorded compute usage.',courses:'Browse courses and enrolment activity.',sessions:'Learning schedule and upcoming sessions.',attendance:'Your confirmed attendance records.',resources:'Learning resources for active enrolments.',assignments:'Submit published coursework and review grades.',certificates:'Completion certificates and verification.'};
 
 type Unit = 'academy' | 'fabrication' | 'compute' | 'digital_business';
 type RecordRow = Record<string, any>;
 const shared = [['dashboard','Overview'],['requests','Requests'],['quotes','Quotes'],['invoices','Invoices'],['payments','Payments'],['files','Files'],['notifications','Notifications'],['support','Support'],['profile','Profile'],['settings','Account security']];
-const specialist = {academy:[['courses','Courses & enrolment'],['sessions','Learning schedule'],['attendance','Attendance'],['resources','Resources & assignments'],['certificates','Certificates']],fabrication:[['production','Fabrication jobs']],compute:[['production','Compute jobs'],['usage','Usage history']],digital_business:[]};
+const specialist = {academy:[['courses','Courses & enrolment'],['sessions','Learning schedule'],['attendance','Attendance'],['resources','Resources'],['assignments','Assignments'],['certificates','Certificates']],fabrication:[['production','Fabrication jobs']],compute:[['production','Compute jobs'],['usage','Usage history']],digital_business:[]};
 const inputClass = 'mt-2 block w-full rounded-xl border p-3';
 const money = (amount: unknown) => amount == null ? 'Awaiting quotation' : new Intl.NumberFormat('en-NG',{style:'currency',currency:'NGN'}).format(Number(amount));
 function Table({rows,columns,empty}:{rows:RecordRow[];columns:[string,string][];empty:string}) {
@@ -25,6 +25,7 @@ export function BusinessPortal({unit}:{unit:Unit}) {
  const [records,setRecords]=useState<Record<string,RecordRow[]>>({}),[loading,setLoading]=useState(true),[error,setError]=useState(''),[notice,setNotice]=useState(''),[search,setSearch]=useState(''),[busy,setBusy]=useState(false);
  const accountScope=useRef('');accountScope.current=`${user?.id}:${unit}`;const uploadInput=useRef<HTMLInputElement>(null);
  const [orderId,setOrderId]=useState(''),[file,setFile]=useState<File|null>(null),[ticket,setTicket]=useState({subject:'',message:'',priority:'normal'});
+ const [transfer,setTransfer]=useState({invoice_id:'',sender_name:'',sender_bank:'',reference:'',transferred_at:''}),[transferProof,setTransferProof]=useState<File|null>(null),[assignmentDrafts,setAssignmentDrafts]=useState<Record<string,{text:string;url:string}>>({});
  const load=useCallback(async()=>{
   if(!user||!supabase)return;
   const orders=await supabase.from('business_orders').select('*').eq('user_id',user.id).eq('unit_code',unit).order('created_at',{ascending:false});
@@ -37,11 +38,13 @@ export function BusinessPortal({unit}:{unit:Unit}) {
   const invoiceIds=(data.business_invoices||[]).map(x=>x.id);
   if(invoiceIds.length){const p=await supabase.from('business_payments').select('*').eq('user_id',user.id).in('invoice_id',invoiceIds);if(p.error)throw p.error;data.business_payments=p.data||[];const intents=await supabase.from('business_payment_intents').select('*').eq('user_id',user.id).in('invoice_id',invoiceIds);if(intents.error)throw intents.error;data.business_payment_intents=intents.data||[];}
   if(unit==='academy'){
-   const [courses,enrollments]=await Promise.all([supabase.from('academy_courses').select('*').eq('is_active',true).order('title'),supabase.from('academy_enrollments').select('*').eq('user_id',user.id)]);
-   if(courses.error||enrollments.error)throw courses.error||enrollments.error;data.courses=courses.data||[];data.enrollments=enrollments.data||[];
-   const courseIds=data.enrollments.map(x=>x.course_id),enrollmentIds=data.enrollments.map(x=>x.id);
+   const [courses,enrollments,banks,transfers]=await Promise.all([supabase.from('academy_courses').select('*').eq('is_active',true).order('title'),supabase.from('academy_enrollments').select('*').eq('user_id',user.id),supabase.from('ihlink_bank_accounts').select('id,label,bank_name,account_name,account_number,is_default').eq('is_active',true).order('is_default',{ascending:false}),supabase.from('direct_transfer_submissions').select('id,invoice_id,amount,status,customer_reference,created_at').eq('user_id',user.id).eq('platform_code','academy').order('created_at',{ascending:false})]);
+   if(courses.error||enrollments.error||banks.error||transfers.error)throw courses.error||enrollments.error||banks.error||transfers.error;data.courses=courses.data||[];data.enrollments=enrollments.data||[];data.academy_banks=banks.data||[];data.academy_transfers=transfers.data||[];
+   const learningEnrollments=data.enrollments.filter(x=>['active','completed'].includes(x.status));const activeEnrollments=data.enrollments.filter(x=>x.status==='active');
+   const courseIds=[...new Set(learningEnrollments.map(x=>x.course_id))],activeCourseIds=[...new Set(activeEnrollments.map(x=>x.course_id))],enrollmentIds=learningEnrollments.map(x=>x.id);
    if(courseIds.length)for(const table of ['academy_sessions','academy_resources']){const r=await supabase.from(table).select('*').in('course_id',courseIds);if(r.error)throw r.error;data[table]=r.data||[];}
-   if(enrollmentIds.length)for(const table of ['academy_attendance','academy_certificates']){const r=await supabase.from(table).select('*').in('enrollment_id',enrollmentIds);if(r.error)throw r.error;data[table]=r.data||[];}
+   if(activeCourseIds.length){const a=await supabase.from('academy_assignments').select('*').in('course_id',activeCourseIds).eq('is_published',true).order('due_at',{ascending:true});if(a.error)throw a.error;data.academy_assignments=a.data||[];}
+   if(enrollmentIds.length)for(const table of ['academy_attendance','academy_certificates','academy_assignment_submissions']){const r=await supabase.from(table).select('*').in('enrollment_id',enrollmentIds);if(r.error)throw r.error;data[table]=r.data||[];}
   }
   return data;
  },[user?.id,unit]);
